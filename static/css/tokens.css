@@ -1,0 +1,229 @@
+:root {
+  color-scheme: light;
+  font-family: "Cairo", "Inter", "Segoe UI", sans-serif;
+  --paper: #f8fafc;
+  --canvas: #f8fafc;
+  --surface: #ffffff;
+  --surface-soft: #f1f5f9;
+  --ink: #102a36;
+  --muted: #526773;
+  --line: #dce5eb;
+  --teal: #0f9d8a;
+  --teal-deep: #087c70;
+  --teal-dark: #087c70;
+  --teal-pale: #e4f5f1;
+  --blue: #2563eb;
+  --navy: #102f3e;
+  --nav: #102f3e;
+  --nav-text: #c3d5dc;
+  --green: #16a34a;
+  --amber: #b45309;
+  --amber-pale: #fff4df;
+  --danger: #dc2626;
+  --red: #b42318;
+  --red-pale: #fff0ee;
+  --shadow: 0 16px 44px rgb(16 42 54 / 8%);
+  --radius-card: 22px;
+  --radius-panel: 18px;
+  --radius-control: 13px;
+  --radius-pill: 999px;
+  color: var(--ink);
+  background: var(--paper);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0b1220;
+  --canvas: #0b1220;
+  --surface: #111a2e;
+  --surface-soft: #18243a;
+  --ink: #e7eef8;
+  --muted: #a4b2c6;
+  --line: #293750;
+  --teal: #43c4ae;
+  --teal-deep: #54d1ba;
+  --teal-dark: #54d1ba;
+  --teal-pale: #173b3a;
+  --blue: #7aa4ff;
+  --navy: #0c1b2c;
+  --nav: #0c1b2c;
+  --nav-text: #becde0;
+  --green: #4ade80;
+  --amber: #fbbf24;
+  --amber-pale: #3a301c;
+  --danger: #f87171;
+  --red: #fca5a5;
+  --red-pale: #3c242c;
+  --shadow: 0 18px 48px rgb(0 0 0 / 28%);
+}
+
+body {
+  font-family: "Cairo", "Inter", "Segoe UI", sans-serif;
+  background-color: var(--paper);
+  color: var(--ink);
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+a,
+button,
+input,
+select,
+textarea,
+summary {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--blue) 72%, white);
+  outline-offset: 3px;
+}
+
+.site-header,
+.topbar {
+  border-color: color-mix(in srgb, var(--line) 78%, transparent);
+  backdrop-filter: blur(18px) saturate(145%);
+}
+
+.site-header.is-scrolled,
+[data-theme="dark"] .site-header.is-scrolled {
+  background: color-mix(in srgb, var(--paper) 90%, transparent);
+}
+
+.hero-visual,
+.welcome-panel,
+.medicine-result,
+.map-panel,
+.how-card,
+.stat-card,
+.story-grid article,
+.demo-stock-card,
+.route-scene,
+.audience-panel,
+.auth-story {
+  border-radius: var(--radius-card);
+}
+
+.hero-search,
+.search-submit,
+.primary-button,
+.login-link,
+.theme-button,
+.icon-button,
+.role-option,
+.submit-button,
+.field input,
+.field select,
+.nearby-pharmacy,
+.nearby-call,
+.filter-chip,
+.emergency-button {
+  border-radius: var(--radius-control);
+}
+
+.popular-searches button,
+.medicine-status,
+.preview-status,
+.nearby-heading > span,
+.story-data-line b,
+.eyebrow,
+.hero-eyebrow {
+  border-radius: var(--radius-pill);
+}
+
+.hero-visual {
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--teal) 18%, var(--line));
+  background: linear-gradient(150deg, var(--surface), color-mix(in srgb, var(--teal-pale) 36%, var(--surface)));
+  box-shadow: var(--shadow);
+  transform: none;
+}
+
+.hero-illustration {
+  display: block;
+  width: min(100%, 520px);
+  height: clamp(150px, 18vw, 220px);
+  margin: 7px auto 0;
+  object-fit: contain;
+}
+
+.hero-preview {
+  margin-top: -4px;
+  border-color: color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: var(--radius-panel);
+  box-shadow: 0 8px 26px rgb(16 42 54 / 7%);
+}
+
+.auth-layout {
+  max-width: 1600px;
+  border-radius: var(--radius-card);
+  overflow: clip;
+}
+
+.auth-story {
+  border-radius: 0;
+  background: linear-gradient(145deg, #e6f7f2, #dcebf9);
+}
+
+.story-art > img {
+  display: block;
+  width: min(100%, 620px);
+  height: min(100%, 360px);
+  object-fit: contain;
+  filter: drop-shadow(0 24px 28px rgb(25 77 82 / 12%));
+}
+
+.medicine-result,
+.stat-card,
+.how-card,
+.story-grid article {
+  border-color: var(--line);
+  box-shadow: 0 6px 22px rgb(16 42 54 / 4%);
+}
+
+[data-theme="dark"] .auth-story {
+  background: linear-gradient(145deg, #12352f, #142840);
+}
+
+[data-theme="dark"] .hero-visual {
+  background: linear-gradient(150deg, var(--surface), color-mix(in srgb, #0f9d8a 10%, var(--surface)));
+}
+
+@media (max-width: 700px) {
+  .wrap {
+    width: min(100% - 32px, 1160px);
+  }
+
+  .hero-illustration {
+    height: 150px;
+  }
+
+  .auth-layout {
+    border-radius: 0;
+  }
+
+  .story-art > img {
+    height: 220px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Unified brand accents used by every page. */
+:root { --brand-navy:#102a43; --brand-teal:#00bfa6; --brand-teal-deep:#007f78; --brand-coral:#e94f55; --brand-amber:#ffc857; }

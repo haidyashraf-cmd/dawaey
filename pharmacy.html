@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>دوائي | لوحة تحكم الصيدلية</title>
+  <meta name="description" content="لوحة تحكم الصيدلية لإدارة الأصناف والمخزون ودليل الفروع والتوريد.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css?v=dashboard-2">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="تنقل لوحة الصيدلية">
+      <a class="brand" href="index.html" aria-label="العودة إلى دوائي">
+        <img src="static/img/dawaey-mark-clean.png" alt="">
+        <span class="brand-copy"><strong>دوائي</strong><small>Dawaey</small></span>
+      </a>
+      <p class="side-label">لوحة الصيدلية</p>
+      <nav class="side-nav">
+        <button class="nav-item is-active" type="button" data-view="overview"><span class="nav-icon" aria-hidden="true">⌂</span><span>نظرة عامة</span></button>
+        <button class="nav-item" type="button" data-view="inventory"><span class="nav-icon" aria-hidden="true">▣</span><span>الأدوية والمخزون</span></button>
+        <button class="nav-item" type="button" data-view="pharmacies"><span class="nav-icon" aria-hidden="true">⌖</span><span>دليل الصيدليات</span></button>
+        <button class="nav-item" type="button" data-view="supply"><span class="nav-icon" aria-hidden="true">↗</span><span>التوريد</span></button>
+        <button class="nav-item" type="button" data-view="donations"><span class="nav-icon" aria-hidden="true">♡</span><span>طلبات التبرع</span></button>
+        <button class="nav-item" type="button" data-view="reports"><span class="nav-icon" aria-hidden="true">▥</span><span>تقارير الاستهلاك</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="source-card"><span class="source-dot" aria-hidden="true"></span><div><strong>بيانات محلية</strong><small id="source-note">جاري تحميل ملف المصدر...</small></div></div>
+        <p class="sidebar-footnote">راجع الكميات قبل اعتماد أي طلب، وتواصل مع الفروع للتأكد من التفاصيل.</p>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="topbar-context"><span class="context-mark" aria-hidden="true"></span><strong>لوحة الصيدلية</strong><span class="context-separator">/</span><span id="current-section">نظرة عامة</span></div>
+        <a class="mobile-brand" href="index.html"><img src="static/img/dawaey-mark-clean.png" alt=""><strong>دوائي</strong></a>
+        <div class="topbar-actions"><span class="today-label" id="today-label">اليوم</span><button class="stock-alert-button" id="stock-alert-button" type="button" aria-label="تنبيهات المخزون" aria-expanded="false">♢<b id="stock-alert-count">0</b></button><button class="icon-button" id="theme-toggle" type="button" aria-label="التبديل للمظهر الليلي">◐</button><button class="export-button" id="export-button" type="button"><span>تصدير التقرير</span><span aria-hidden="true">↓</span></button></div>
+      </header><aside class="stock-alert-panel" id="stock-alert-panel" hidden aria-live="polite"></aside>
+
+      <div class="page-wrap"><div id="page-content" aria-busy="true"><section class="panel empty-state"><strong>جاري تحميل لوحة الصيدلية...</strong></section></div><footer class="page-footer"><span>دوائي · لوحة تحكم الصيدلية</span><a href="index.html">العودة إلى صفحة المريض</a></footer></div>
+    </main>
+  </div>
+  <nav class="mobile-nav" aria-label="تنقل سريع"><button class="mobile-nav-item is-active" type="button" data-view="overview"><span class="mobile-nav-icon">⌂</span><span>الرئيسية</span></button><button class="mobile-nav-item" type="button" data-view="inventory"><span class="mobile-nav-icon">▣</span><span>المخزون</span></button><button class="mobile-nav-item" type="button" data-view="pharmacies"><span class="mobile-nav-icon">⌖</span><span>الصيدليات</span></button><button class="mobile-nav-item" type="button" data-view="supply"><span class="mobile-nav-icon">↗</span><span>التوريد</span></button><button class="mobile-nav-item" type="button" data-view="reports"><span class="mobile-nav-icon">▥</span><span>التقارير</span></button></nav>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js?v=dashboard-2" defer></script>
+</body>
+</html>

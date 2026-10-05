@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f8f5">
+  <meta name="description" content="سجّل دخولك أو أنشئ حساب مريض أو صيدلية على دوائي.">
+  <title>دوائي | الدخول والتسجيل</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" href="static/img/dawaey-mark-clean.png" type="image/png">
+  <link rel="stylesheet" href="auth.css?v=identity-7">
+  <link rel="stylesheet" href="static/css/tokens.css?v=identity-2">
+  <script src="auth.js" defer></script>
+</head>
+<body>
+  <main class="auth-layout">
+    <section class="auth-main" aria-labelledby="auth-title">
+      <div class="auth-topbar">
+        <a class="auth-brand" href="index.html" aria-label="دوائي، الصفحة الرئيسية"><img src="static/img/dawaey-logo-clean.png" alt="شعار دوائي" width="86" height="90"><span><strong>دوائي</strong><small>Dawaey</small></span></a>
+        <a class="auth-back" href="index.html"><span aria-hidden="true">→</span> رجوع للبحث</a>
+      </div>
+      <div class="auth-content">
+        <div class="auth-card-visual"><img class="auth-card-photo" src="static/img/medicine-basket.jpg" alt="سلة تضم أنواعًا مختلفة من الأدوية والمستلزمات الطبية على خلفية تركوازية" width="735" height="490" fetchpriority="high"><div class="auth-card-caption"><span>دوائي</span><strong>خطوة أهدى تبدأ بمعلومة أوضح</strong></div></div>
+        <div class="auth-heading"><span class="eyebrow">حسابك في دوائي</span><h1 id="auth-title">سجّل دخولك</h1><p id="auth-description">ادخل بيانات حسابك للمتابعة في دوائي.</p></div>
+
+        <p class="auth-group-title">اختار نوع حسابك</p>
+        <div class="role-picker" role="group" aria-label="نوع الحساب">
+          <button class="role-option is-active" type="button" data-role="patient" aria-pressed="true"><span class="role-icon" aria-hidden="true">♡</span><span><strong>مريض</strong><small>بحث وأدوية محفوظة</small></span></button>
+          <button class="role-option" type="button" data-role="pharmacy" aria-pressed="false"><span class="role-icon pharmacy-role-icon" aria-hidden="true">✚</span><span><strong>صيدلية</strong><small>تسجيل فرع جديد</small></span></button>
+        </div>
+
+        <p class="auth-group-title auth-mode-title">اختار طريقة المتابعة</p>
+        <div class="auth-mode" role="tablist" aria-label="طريقة الحساب">
+          <button type="button" role="tab" class="is-active" data-mode="login" aria-selected="true">تسجيل الدخول</button>
+          <button type="button" role="tab" data-mode="register" aria-selected="false">حساب جديد</button>
+        </div>
+
+        <form id="account-form" novalidate>
+          <div class="field-grid">
+            <label class="field" data-register-only hidden><span>الاسم بالكامل</span><input name="fullName" type="text" autocomplete="name" maxlength="100" placeholder="اسم المريض أو الصيدلي" data-required></label>
+            <label class="field"><span id="contact-label">الموبايل أو البريد الإلكتروني</span><input name="contact" type="text" inputmode="text" autocomplete="username" placeholder="01xxxxxxxxx أو name@email.com" required></label>
+
+            <div class="role-fields patient-fields" data-role-fields="patient" data-register-only hidden>
+              <label class="field"><span>المحافظة</span><input name="patientGovernorate" type="text" list="governorate-options" autocomplete="address-level1" placeholder="مثال: القاهرة" data-required><datalist id="governorate-options"></datalist></label>
+              <label class="field"><span>المنطقة</span><input name="patientDistrict" type="text" list="district-options" autocomplete="address-level2" placeholder="مثال: المعادي" data-required><datalist id="district-options"></datalist></label>
+            </div>
+
+            <div class="role-fields pharmacy-fields" data-role-fields="pharmacy" data-register-only hidden>
+              <label class="field"><span>اسم الصيدلية</span><input name="pharmacyName" type="text" maxlength="120" autocomplete="organization" data-required></label>
+              <label class="field"><span>اسم الصيدلي المسؤول</span><input name="pharmacistName" type="text" autocomplete="name" data-required></label>
+              <label class="field"><span>رقم الترخيص أو السجل</span><input name="licenseNumber" type="text" maxlength="64" data-required></label>
+              <label class="field field-wide"><span>العنوان بالتفصيل</span><input name="address" type="text" maxlength="240" autocomplete="street-address" placeholder="الشارع، رقم العقار، علامة مميزة" data-required></label>
+              <label class="field"><span>المحافظة</span><input name="pharmacyGovernorate" type="text" list="governorate-options" autocomplete="address-level1" data-required></label>
+              <label class="field"><span>المنطقة</span><input name="pharmacyDistrict" type="text" list="district-options" autocomplete="address-level2" data-required></label>
+              <label class="field"><span>مواعيد العمل</span><input name="openingHours" type="text" placeholder="يوميًا من ٩ صباحًا لـ ١٢ مساءً" data-required></label>
+              <label class="field"><span>رقم واتساب</span><input name="whatsapp" type="tel" inputmode="tel" placeholder="01xxxxxxxxx" data-required></label>
+              <p class="form-note field-wide">عنوان الفرع يتسجل للمراجعة؛ الإحداثيات ومشاركة الموقع مش متاحة في المصدر الحالي.</p>
+            </div>
+
+            <label class="field"><span>كلمة المرور</span><span class="password-wrap"><input name="password" type="password" autocomplete="current-password" minlength="8" required><button class="password-toggle" type="button" aria-label="إظهار كلمة المرور">إظهار</button></span></label>
+            <label class="field confirm-field" data-register-only hidden><span>تأكيد كلمة المرور</span><input name="passwordConfirm" type="password" autocomplete="new-password" minlength="8" data-required></label>
+          </div>
+
+          <div class="password-strength" id="password-strength" hidden><span class="strength-track"><i></i></span><small>قوة كلمة المرور</small></div>
+          <label class="privacy-check" data-register-only hidden><input name="privacyAccepted" type="checkbox" value="yes" data-required><span>موافق على حفظ بيانات الحساب محليًا لاستخدام دوائي.</span></label>
+          <div class="form-message" id="form-message" role="alert" aria-live="polite" hidden></div>
+          <button class="submit-button" id="submit-button" type="submit">تسجيل الدخول <span aria-hidden="true">←</span></button>
+          <p class="review-note" id="review-note" hidden>تسجيل الصيدلية يرسل طلبًا محفوظًا للمراجعة، ولا يفعّل حسابًا أو يضيف الفرع للدليل تلقائيًا.</p>
+          <button class="google-button" type="button" disabled title="تسجيل Google يحتاج إعداد OAuth">متابعة باستخدام Google <span>غير متاح حاليًا</span></button>
+          <p class="form-footnote" id="mode-footnote">بياناتك لا تظهر في رابط الصفحة.</p>
+        </form>
+
+        <section class="signed-in-panel" id="signed-in-panel" hidden aria-live="polite"></section>
+      </div>
+      <p class="auth-footer"><a href="index.html#questions">عن الخصوصية والبيانات</a><span>·</span> نسخة تشغيل محلية</p>
+    </section>
+  </main>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

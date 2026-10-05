@@ -1,0 +1,9 @@
+{
+  "name": "dawaey-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "python scripts/server.py",
+    "export-data": "python scripts/export_workbook.py"
+  }
+}
