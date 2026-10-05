@@ -1,4 +1,6 @@
 const INVENTORY_SHEET = "الاصناف والكميات";
+const API_BASE = (window.DAWAEY_API_BASE ?? ((location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "" : "https://dawaey-production.up.railway.app")).replace(/\/+$/, "");
+const apiUrl = (path) => `${API_BASE}/api/${path}`;
 const SUPPLY_SHEET = "طلبات التوريد";
 const PHARMACY_SHEET = "بيانات الصيداليات";
 const numberFormat = new Intl.NumberFormat("ar-EG");
@@ -483,7 +485,7 @@ function setupEvents() {
     navigator.geolocation.getCurrentPosition(async ({ coords }) => {
       try {
         const parameters = new URLSearchParams({ lat: String(coords.latitude), lon: String(coords.longitude) });
-        const response = await fetch(`/api/area?${parameters}`, { credentials: "same-origin" });
+        const response = await fetch(`${API_BASE}/api/area?${parameters}`, { credentials: "include" });
         const result = await response.json().catch(() => ({}));
         if (!response.ok || !result.area) throw new Error(result.error || "area unavailable");
         const area = result.area;
@@ -586,7 +588,7 @@ async function start() {
   let data;
   let session = { user: null };
   try {
-    const response = await fetch("/api/bootstrap", { credentials: "same-origin" });
+    const response = await fetch(apiUrl("bootstrap"), { credentials: "include" });
     if (!response.ok) throw new Error("API unavailable");
     data = await response.json();
   } catch {
@@ -598,7 +600,7 @@ async function start() {
     }
   }
   try {
-    const response = await fetch("/api/session", { credentials: "same-origin" });
+    const response = await fetch(apiUrl("session"), { credentials: "include" });
     if (response.ok) session = await response.json();
   } catch {
     // Static hosting has no session API; the patient search remains available.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import html
 import hmac
 import json
 import math
@@ -29,6 +30,10 @@ SESSION_SECONDS = 60 * 60 * 24 * 14
 PBKDF2_ITERATIONS = 310_000
 GEOCODE_LOCK = threading.Lock()
 LAST_GEOCODE_REQUEST = 0.0
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+TELEGRAM_ADMIN_CHAT_ID = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "").strip()
+TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "").strip()
+FRONTEND_ORIGINS = {origin.strip().rstrip("/") for origin in os.environ.get("DAWAEY_FRONTEND_ORIGINS", "").split(",") if origin.strip()}
 
 
 def db_execute(connection, query: str, params: tuple = ()):
@@ -144,6 +149,85 @@ def password_digest(password: str, salt: bytes) -> bytes:
     return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PBKDF2_ITERATIONS)
 
 
+def telegram_request(method: str, payload: dict) -> dict:
+    if not TELEGRAM_BOT_TOKEN:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN is not configured")
+    body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    request = Request(
+        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/{method}",
+        data=body,
+        headers={"Content-Type": "application/json", "User-Agent": "DawaeyBot/1.0"},
+        method="POST",
+    )
+    with urlopen(request, timeout=10) as response:
+        result = json.loads(response.read().decode("utf-8"))
+    if not result.get("ok"):
+        raise RuntimeError(result.get("description", "Telegram request failed"))
+    return result.get("result", {})
+
+
+def notify_pharmacy_application(application: dict) -> None:
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_ADMIN_CHAT_ID:
+        print("Telegram approval is not configured; application remains pending")
+        return
+    e = lambda value: html.escape(str(value or ""))
+    text = (
+        "<b>طلب تسجيل صيدلية جديد</b>\n\n"
+        f"<b>رقم الطلب:</b> <code>{e(application['account_id'])}</code>\n"
+        f"<b>الصيدلية:</b> {e(application['pharmacy_name'])}\n"
+        f"<b>المسؤول:</b> {e(application['pharmacist_name'])}\n"
+        f"<b>التواصل:</b> {e(application['contact'])}\n"
+        f"<b>الترخيص:</b> {e(application['license_number'])}\n"
+        f"<b>العنوان:</b> {e(application['address'])} - {e(application['district'])}\n"
+        f"<b>المواعيد:</b> {e(application['opening_hours'])}\n"
+        f"<b>واتساب:</b> {e(application['whatsapp'])}"
+    )
+    telegram_request("sendMessage", {
+        "chat_id": TELEGRAM_ADMIN_CHAT_ID,
+        "text": text,
+        "parse_mode": "HTML",
+        "reply_markup": {"inline_keyboard": [[
+            {"text": "✅ قبول وفتح الحساب", "callback_data": f"pharmacy:approve:{application['account_id']}"},
+            {"text": "❌ رفض الطلب", "callback_data": f"pharmacy:reject:{application['account_id']}"},
+        ]]},
+    })
+
+
+def handle_telegram_update(update: dict) -> None:
+    callback = update.get("callback_query") or {}
+    if not callback:
+        message = update.get("message") or {}
+        if str(message.get("text", "")).strip() == "/start":
+            telegram_request("sendMessage", {
+                "chat_id": message.get("chat", {}).get("id"),
+                "text": "تم ربط بوت دوائي. رقم هذه المحادثة هو: " + str(message.get("chat", {}).get("id")),
+            })
+        return
+    callback_id = callback.get("id")
+    callback_message = callback.get("message") or {}
+    actor_chat_id = str((callback_message.get("chat") or {}).get("id", ""))
+    if TELEGRAM_ADMIN_CHAT_ID and actor_chat_id != TELEGRAM_ADMIN_CHAT_ID:
+        telegram_request("answerCallbackQuery", {"callback_query_id": callback_id, "text": "غير مصرح بهذا الإجراء.", "show_alert": True})
+        return
+    parts = str(callback.get("data", "")).split(":")
+    if len(parts) != 3 or parts[0] != "pharmacy" or parts[1] not in {"approve", "reject"}:
+        return
+    account_id = parts[2]
+    new_status = "approved" if parts[1] == "approve" else "rejected"
+    with database_connection() as connection:
+        updated = db_execute(connection, "UPDATE pharmacy_applications SET status = ? WHERE account_id = ? AND status = 'pending'", (new_status, account_id)).rowcount
+        application = db_execute(connection, "SELECT pharmacy_name FROM pharmacy_applications WHERE account_id = ?", (account_id,)).fetchone()
+    if not updated:
+        text = "تم اتخاذ قرار على هذا الطلب من قبل." 
+    elif new_status == "approved":
+        text = f"✅ تم قبول طلب {application['pharmacy_name'] if application else account_id}. يمكن للصيدلية تسجيل الدخول الآن."
+    else:
+        text = f"❌ تم رفض طلب {application['pharmacy_name'] if application else account_id}."
+    telegram_request("answerCallbackQuery", {"callback_query_id": callback_id, "text": text, "show_alert": True})
+    if callback_message.get("chat", {}).get("id"):
+        telegram_request("editMessageReplyMarkup", {"chat_id": callback_message["chat"]["id"], "message_id": callback_message.get("message_id"), "reply_markup": {"inline_keyboard": []}})
+
+
 def create_session(connection: sqlite3.Connection, account_id: int) -> str:
     token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(token.encode("ascii")).hexdigest()
@@ -182,6 +266,11 @@ class DawaeyHandler(SimpleHTTPRequestHandler):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        origin = self.headers.get("Origin", "").rstrip("/")
+        if origin and origin in FRONTEND_ORIGINS:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Credentials", "true")
+            self.send_header("Vary", "Origin")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
@@ -206,8 +295,25 @@ class DawaeyHandler(SimpleHTTPRequestHandler):
         return payload
 
     def verify_origin(self) -> bool:
-        origin = self.headers.get("Origin")
-        return not origin or urlsplit(origin).netloc == self.headers.get("Host")
+        origin = self.headers.get("Origin", "").rstrip("/")
+        if not origin:
+            return True
+        return urlsplit(origin).netloc == self.headers.get("Host") or origin in FRONTEND_ORIGINS
+
+    def do_OPTIONS(self) -> None:
+        origin = self.headers.get("Origin", "").rstrip("/")
+        if origin and origin not in FRONTEND_ORIGINS and urlsplit(origin).netloc != self.headers.get("Host"):
+            self.send_error(403)
+            return
+        self.send_response(204)
+        if origin:
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Credentials", "true")
+            self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Telegram-Bot-Api-Secret-Token")
+        self.send_header("Access-Control-Max-Age", "600")
+        self.end_headers()
 
     def get_session_token(self) -> str | None:
         cookie = SimpleCookie()
@@ -250,6 +356,17 @@ class DawaeyHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self) -> None:
         route = urlsplit(self.path).path
+        if route == "/api/telegram/webhook":
+            secret = self.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+            if TELEGRAM_WEBHOOK_SECRET and secret != TELEGRAM_WEBHOOK_SECRET:
+                self.send_error(403)
+                return
+            try:
+                handle_telegram_update(self.read_json())
+            except Exception as error:
+                self.log_error("Telegram webhook error: %s", error)
+            self.send_json(200, {"ok": True})
+            return
         if not route.startswith("/api/"):
             self.send_error(404)
             return
@@ -395,11 +512,19 @@ class DawaeyHandler(SimpleHTTPRequestHandler):
                 raise ValueError("كمّل بيانات الصيدلية والصيدلي المسؤول والعنوان ومواعيد العمل.")
             if len(license_number) > 64 or len(pharmacy_name) > 120 or len(address) > 240:
                 raise ValueError("راجع طول بيانات الصيدلية.")
-            db_execute(connection, 
+            db_execute(connection,
                 "INSERT INTO pharmacy_applications(account_id, pharmacy_name, pharmacist_name, license_number, address, district, opening_hours, whatsapp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (account_id, pharmacy_name, pharmacist_name, license_number, address, district, opening_hours, whatsapp),
             )
-        self.send_json(202, {"status": "pending", "message": "تم حفظ طلب الصيدلية. الحساب قيد المراجعة قبل تفعيله."})
+        try:
+            notify_pharmacy_application({
+                "account_id": account_id, "pharmacy_name": pharmacy_name, "pharmacist_name": pharmacist_name,
+                "contact": contact, "license_number": license_number, "address": address,
+                "district": district, "opening_hours": opening_hours, "whatsapp": whatsapp,
+            })
+        except Exception as error:
+            self.log_error("Could not notify Telegram about pharmacy application: %s", error)
+        self.send_json(202, {"status": "pending", "message": "تم حفظ الطلب وإرساله للمراجعة. بعد القبول من بوت الإدارة، سجّل الدخول لفتح لوحة الصيدلية."})
 
     def handle_login(self, payload: dict) -> None:
         _, contact_key = normalize_contact(payload.get("contact"))

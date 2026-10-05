@@ -4,6 +4,8 @@ const form = document.querySelector("#account-form");
 const message = document.querySelector("#form-message");
 const submitButton = document.querySelector("#submit-button");
 const numberFormat = new Intl.NumberFormat("ar-EG");
+const API_BASE = (window.DAWAEY_API_BASE ?? ((location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "" : "https://dawaey-production.up.railway.app")).replace(/\/+$/, "");
+const apiUrl = (path) => `${API_BASE}/api/${path}`;
 
 function setMessage(text, kind = "error") {
   message.textContent = text;
@@ -58,7 +60,7 @@ function syncForm() {
     ? state.role === "pharmacy" ? "قدّم بيانات الفرع للمراجعة قبل تفعيل الحساب." : "اكتب بياناتك مرة واحدة عشان تحفظ أدويتك." 
     : "ادخل بيانات حسابك للمتابعة في دوائي.";
   document.querySelector("#mode-footnote").textContent = registering
-    ? "بيانات التسجيل تُحفظ في قاعدة دوائي المحلية، وكلمة المرور لا تُحفظ كنص مباشر."
+    ? "بيانات التسجيل تُحفظ في قاعدة دوائي الآمنة، وكلمة المرور لا تُحفظ كنص مباشر."
     : "الدخول متاح من الخادم أو كوضع عرض محفوظ على جهازك.";
   clearFieldErrors();
 }
@@ -91,9 +93,9 @@ function escapeHtml(value) {
 }
 
 async function requestApi(path, payload) {
-  const response = await fetch(`/api/${path}`, {
+  const response = await fetch(apiUrl(path), {
     method: payload ? "POST" : "GET",
-    credentials: "same-origin",
+    credentials: "include",
     headers: payload ? { "Content-Type": "application/json" } : undefined,
     body: payload ? JSON.stringify(payload) : undefined,
   });
@@ -251,7 +253,7 @@ async function initializeAuth() {
     fillLocationSuggestions(bootstrap.pharmacies ?? []);
     if (session.user) showAccount(session.user);
   } catch {
-    staticSiteMode = true;
+    staticSiteMode = !API_BASE;
     try {
       const response = await fetch("data/dawaey-data.json", { cache: "no-store" });
       const workbook = await response.json();
