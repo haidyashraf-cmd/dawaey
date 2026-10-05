@@ -567,14 +567,43 @@ function setupEvents() {
   });
 }
 
+async function loadStaticCatalog() {
+  const response = await fetch("data/dawaey-data.json", { cache: "no-store" });
+  if (!response.ok) throw new Error("تعذر تحميل ملف بيانات الأدوية");
+  const workbook = await response.json();
+  const sheets = workbook.sheets || {};
+  const inventory = sheets[INVENTORY_SHEET] || [];
+  const supply = sheets[SUPPLY_SHEET] || [];
+  const pharmacies = sheets[PHARMACY_SHEET] || [];
+  const supplyByNumber = new Map(supply.map((record) => [String(record["م"]), record]));
+  return {
+    catalog: inventory.map((item) => ({ ...item, ...(supplyByNumber.get(String(item["م"])) || {}) })),
+    pharmacies,
+  };
+}
+
 async function start() {
+  let data;
+  let session = { user: null };
   try {
-    const [dataResponse, sessionResponse] = await Promise.all([
-      fetch("/api/bootstrap", { credentials: "same-origin" }),
-      fetch("/api/session", { credentials: "same-origin" }),
-    ]);
-    if (!dataResponse.ok || !sessionResponse.ok) throw new Error("تعذر تحميل بيانات دوائي");
-    const [data, session] = await Promise.all([dataResponse.json(), sessionResponse.json()]);
+    const response = await fetch("/api/bootstrap", { credentials: "same-origin" });
+    if (!response.ok) throw new Error("API unavailable");
+    data = await response.json();
+  } catch {
+    try {
+      data = await loadStaticCatalog();
+      showToast("تم تحميل بيانات الأدوية من الملف المحلي");
+    } catch {
+      showToast("بيانات البحث غير متاحة؛ تأكد من رفع مجلد data مع الموقع");
+    }
+  }
+  try {
+    const response = await fetch("/api/session", { credentials: "same-origin" });
+    if (response.ok) session = await response.json();
+  } catch {
+    // Static hosting has no session API; the patient search remains available.
+  }
+  if (data) {
     state.inventory = data.catalog ?? [];
     state.pharmacies = data.pharmacies ?? [];
     state.user = session.user ?? null;
@@ -586,8 +615,6 @@ async function start() {
       loginLink.textContent = state.user.name;
       loginLink.setAttribute("aria-label", `حساب ${state.user.name}`);
     }
-  } catch {
-    showToast("بيانات البحث مش متاحة؛ افتح الصفحة من الخادم المحلي");
   }
   setupTabs();
   setupDemo();

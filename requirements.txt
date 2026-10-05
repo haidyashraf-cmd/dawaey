@@ -1,1 +1,1 @@
-# Dawaey runtime uses only Python standard-library modules.
+pymysql==1.1.1

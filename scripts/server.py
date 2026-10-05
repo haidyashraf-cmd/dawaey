@@ -7,20 +7,22 @@ import math
 import os
 import re
 import secrets
+import ssl
 import sqlite3
 import sys
 import threading
 import time
-from contextlib import closing
+from contextlib import closing, contextmanager
 from http.cookies import SimpleCookie
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import URLError
-from urllib.parse import parse_qs, urlencode, urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit, unquote
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_PATH = ROOT / "data" / "dawaey-data.json"
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 DATABASE_PATH = Path(os.environ.get("DAWAEY_DATABASE", ROOT / "data" / "dawaey-users.sqlite3"))
 SESSION_COOKIE = "dawaey_session"
 SESSION_SECONDS = 60 * 60 * 24 * 14
@@ -29,16 +31,63 @@ GEOCODE_LOCK = threading.Lock()
 LAST_GEOCODE_REQUEST = 0.0
 
 
-def connect_database() -> sqlite3.Connection:
-    DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
+def db_execute(connection, query: str, params: tuple = ()):
+    if DATABASE_URL:
+        return connection.cursor().execute(query.replace("?", "%s"), params)
+    return connection.execute(query, params)
+
+
+def connect_database():
+    if DATABASE_URL:
+        try:
+            import pymysql
+        except ImportError as error:
+            raise RuntimeError("PyMySQL is required when DATABASE_URL is configured.") from error
+        parsed = urlsplit(DATABASE_URL)
+        database = parsed.path.lstrip("/")
+        if not parsed.hostname or not database:
+            raise RuntimeError("DATABASE_URL is not a valid MySQL connection URL.")
+        return pymysql.connect(
+            host=parsed.hostname,
+            port=parsed.port or 3306,
+            user=unquote(parsed.username or ""),
+            password=unquote(parsed.password or ""),
+            database=database,
+            cursorclass=pymysql.cursors.DictCursor,
+            autocommit=False,
+            ssl=ssl.create_default_context(),
+            connect_timeout=10,
+        )
+    import sqlite3
     connection = sqlite3.connect(DATABASE_PATH, timeout=10)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA foreign_keys = ON")
     return connection
 
 
+@contextmanager
+def database_connection():
+    connection = connect_database()
+    try:
+        with connection:
+            yield connection
+    finally:
+        if getattr(connection, "open", True):
+            connection.close()
+
+
 def initialize_database() -> None:
-    with closing(connect_database()) as connection, connection:
+    with database_connection() as connection:
+        if DATABASE_URL:
+            statements = (
+                "CREATE TABLE IF NOT EXISTS accounts (id BIGINT PRIMARY KEY AUTO_INCREMENT, role VARCHAR(20) NOT NULL, full_name VARCHAR(100) NOT NULL, contact VARCHAR(255) NOT NULL, contact_key VARCHAR(255) NOT NULL UNIQUE, password_salt VARCHAR(64) NOT NULL, password_hash VARCHAR(128) NOT NULL, created_at BIGINT NOT NULL)",
+                "CREATE TABLE IF NOT EXISTS patient_profiles (account_id BIGINT PRIMARY KEY, governorate VARCHAR(120) NOT NULL, district VARCHAR(160) NOT NULL, CONSTRAINT fk_patient_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE)",
+                "CREATE TABLE IF NOT EXISTS pharmacy_applications (account_id BIGINT PRIMARY KEY, pharmacy_name VARCHAR(120) NOT NULL, pharmacist_name VARCHAR(120) NOT NULL, license_number VARCHAR(64) NOT NULL UNIQUE, address VARCHAR(240) NOT NULL, district VARCHAR(160) NOT NULL, opening_hours VARCHAR(160) NOT NULL, whatsapp VARCHAR(40) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'pending', CONSTRAINT fk_pharmacy_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE)",
+                "CREATE TABLE IF NOT EXISTS sessions (token_hash VARCHAR(128) PRIMARY KEY, account_id BIGINT NOT NULL, expires_at BIGINT NOT NULL, CONSTRAINT fk_session_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE)",
+            )
+            for statement in statements:
+                db_execute(connection, statement)
+            return
         connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS accounts (
@@ -98,7 +147,7 @@ def password_digest(password: str, salt: bytes) -> bytes:
 def create_session(connection: sqlite3.Connection, account_id: int) -> str:
     token = secrets.token_urlsafe(32)
     token_hash = hashlib.sha256(token.encode("ascii")).hexdigest()
-    connection.execute(
+    db_execute(connection, 
         "INSERT INTO sessions(token_hash, account_id, expires_at) VALUES (?, ?, ?)",
         (token_hash, account_id, int(time.time()) + SESSION_SECONDS),
     )
@@ -113,7 +162,7 @@ def public_account(connection: sqlite3.Connection, account: sqlite3.Row) -> dict
         "contact": account["contact"],
     }
     if account["role"] == "pharmacy":
-        application = connection.execute(
+        application = db_execute(connection, 
             "SELECT pharmacy_name, status FROM pharmacy_applications WHERE account_id = ?",
             (account["id"],),
         ).fetchone()
@@ -219,7 +268,16 @@ class DawaeyHandler(SimpleHTTPRequestHandler):
                 self.send_json(404, {"error": "المسار غير موجود."})
         except ValueError as error:
             self.send_json(400, {"error": str(error)})
-        except sqlite3.IntegrityError as error:
+        except Exception as error:
+            integrity_types = (sqlite3.IntegrityError,)
+            try:
+                import pymysql
+            except ImportError:
+                pass
+            else:
+                integrity_types += (pymysql.err.IntegrityError,)
+            if not isinstance(error, integrity_types):
+                raise
             message = "رقم التواصل مسجل بالفعل. جرّب تسجيل الدخول."
             if "pharmacy_applications.license_number" in str(error):
                 message = "رقم الترخيص مسجل بالفعل."
@@ -305,8 +363,8 @@ class DawaeyHandler(SimpleHTTPRequestHandler):
         salt = secrets.token_bytes(16)
         encoded_salt = salt.hex()
         encoded_hash = password_digest(password, salt).hex()
-        with closing(connect_database()) as connection, connection:
-            cursor = connection.execute(
+        with database_connection() as connection:
+            cursor = db_execute(connection, 
                 "INSERT INTO accounts(role, full_name, contact, contact_key, password_salt, password_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (role, full_name, contact, contact_key, encoded_salt, encoded_hash, int(time.time())),
             )
@@ -316,12 +374,12 @@ class DawaeyHandler(SimpleHTTPRequestHandler):
                 district = str(payload.get("district", "")).strip()
                 if not governorate or not district:
                     raise ValueError("اختار المحافظة والمنطقة.")
-                connection.execute(
+                db_execute(connection, 
                     "INSERT INTO patient_profiles(account_id, governorate, district) VALUES (?, ?, ?)",
                     (account_id, governorate, district),
                 )
                 token = create_session(connection, account_id)
-                account = connection.execute("SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone()
+                account = db_execute(connection, "SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone()
                 cookie = self.session_cookie(token)
                 self.send_json(201, {"user": public_account(connection, account)}, cookie)
                 return
@@ -337,7 +395,7 @@ class DawaeyHandler(SimpleHTTPRequestHandler):
                 raise ValueError("كمّل بيانات الصيدلية والصيدلي المسؤول والعنوان ومواعيد العمل.")
             if len(license_number) > 64 or len(pharmacy_name) > 120 or len(address) > 240:
                 raise ValueError("راجع طول بيانات الصيدلية.")
-            connection.execute(
+            db_execute(connection, 
                 "INSERT INTO pharmacy_applications(account_id, pharmacy_name, pharmacist_name, license_number, address, district, opening_hours, whatsapp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (account_id, pharmacy_name, pharmacist_name, license_number, address, district, opening_hours, whatsapp),
             )
@@ -347,8 +405,8 @@ class DawaeyHandler(SimpleHTTPRequestHandler):
         _, contact_key = normalize_contact(payload.get("contact"))
         password = str(payload.get("password", ""))
         role = str(payload.get("role", ""))
-        with closing(connect_database()) as connection, connection:
-            account = connection.execute("SELECT * FROM accounts WHERE contact_key = ?", (contact_key,)).fetchone()
+        with database_connection() as connection:
+            account = db_execute(connection, "SELECT * FROM accounts WHERE contact_key = ?", (contact_key,)).fetchone()
             if not account or not hmac.compare_digest(
                 bytes.fromhex(account["password_hash"]),
                 password_digest(password, bytes.fromhex(account["password_salt"])),
@@ -359,7 +417,7 @@ class DawaeyHandler(SimpleHTTPRequestHandler):
                 self.send_json(401, {"error": "نوع الحساب لا يطابق بيانات الدخول."})
                 return
             if account["role"] == "pharmacy":
-                application = connection.execute(
+                application = db_execute(connection, 
                     "SELECT status FROM pharmacy_applications WHERE account_id = ?", (account["id"],)
                 ).fetchone()
                 if not application or application["status"] != "approved":
@@ -374,13 +432,13 @@ class DawaeyHandler(SimpleHTTPRequestHandler):
             self.send_json(200, {"user": None})
             return
         token_hash = hashlib.sha256(token.encode("ascii", errors="ignore")).hexdigest()
-        with closing(connect_database()) as connection, connection:
-            account = connection.execute(
+        with database_connection() as connection:
+            account = db_execute(connection, 
                 "SELECT accounts.* FROM sessions JOIN accounts ON accounts.id = sessions.account_id WHERE sessions.token_hash = ? AND sessions.expires_at > ?",
                 (token_hash, int(time.time())),
             ).fetchone()
             if not account:
-                connection.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
+                db_execute(connection, "DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
                 self.send_json(200, {"user": None}, self.expired_cookie())
                 return
             self.send_json(200, {"user": public_account(connection, account)})
@@ -389,8 +447,8 @@ class DawaeyHandler(SimpleHTTPRequestHandler):
         token = self.get_session_token()
         if token:
             token_hash = hashlib.sha256(token.encode("ascii", errors="ignore")).hexdigest()
-            with closing(connect_database()) as connection, connection:
-                connection.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
+            with database_connection() as connection:
+                db_execute(connection, "DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
         self.send_json(200, {"ok": True}, self.expired_cookie())
 
     @staticmethod

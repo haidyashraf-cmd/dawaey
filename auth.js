@@ -1,4 +1,5 @@
 const state = { role: "patient", mode: "login", busy: false };
+let staticSiteMode = false;
 const form = document.querySelector("#account-form");
 const message = document.querySelector("#form-message");
 const submitButton = document.querySelector("#submit-button");
@@ -58,7 +59,7 @@ function syncForm() {
     : "ادخل بيانات حسابك للمتابعة في دوائي.";
   document.querySelector("#mode-footnote").textContent = registering
     ? "بيانات التسجيل تُحفظ في قاعدة دوائي المحلية، وكلمة المرور لا تُحفظ كنص مباشر."
-    : "الدخول آمن بكلمة مرور مشفّرة على الخادم المحلي.";
+    : "الدخول متاح من الخادم أو كوضع عرض محفوظ على جهازك.";
   clearFieldErrors();
 }
 
@@ -107,7 +108,7 @@ function showAccount(user) {
   document.querySelector(".auth-mode").hidden = true;
   const panel = document.querySelector("#signed-in-panel");
   const isPharmacy = user.role === "pharmacy";
-  panel.innerHTML = `<h2>أهلاً ${escapeHtml(user.name)}</h2><p>${isPharmacy ? `حساب ${escapeHtml(user.pharmacyName || "الصيدلية")} في انتظار موافقة إدارة دوائي.` : "تم تسجيل دخولك. تقدر ترجع للبحث وتكمل من حيث وصلت."}</p><span class="${isPharmacy ? "pending-mark" : "pending-mark"}">${isPharmacy ? "قيد المراجعة" : "حساب مريض"}</span><div class="signed-in-actions"><a href="index.html${isPharmacy ? "#for-everyone" : "#my-medicines"}">العودة إلى دوائي</a><button type="button" id="logout-button">تسجيل الخروج</button></div>`;
+  panel.innerHTML = `<h2>أهلاً ${escapeHtml(user.name)}</h2><p>${isPharmacy ? `حساب ${escapeHtml(user.pharmacyName || "الصيدلية")} في انتظار موافقة إدارة دوائي.` : "تم تسجيل دخولك. تقدر ترجع للبحث وتكمل من حيث وصلت."}</p><span class="${isPharmacy ? "pending-mark" : "pending-mark"}">${isPharmacy ? "قيد المراجعة" : "حساب مريض"}</span><div class="signed-in-actions"><a href="home.html${isPharmacy ? "#for-everyone" : "#my-medicines"}">العودة إلى دوائي</a><button type="button" id="logout-button">تسجيل الخروج</button></div>`;
   panel.hidden = false;
   document.querySelector("#auth-title").textContent = isPharmacy ? "طلب الصيدلية" : "تم تسجيل الدخول";
   document.querySelector("#auth-description").textContent = isPharmacy ? "هنتواصل معاك بعد مراجعة البيانات." : `الحساب مرتبط بـ ${user.contact}.`;
@@ -118,7 +119,7 @@ function showPendingApplication(pharmacyName) {
   document.querySelector(".role-picker").hidden = true;
   document.querySelector(".auth-mode").hidden = true;
   const panel = document.querySelector("#signed-in-panel");
-  panel.innerHTML = `<span class="pending-mark">طلب قيد المراجعة</span><h2>وصلنا طلب ${escapeHtml(pharmacyName)}</h2><p>حفظنا بيانات الصيدلية في قاعدة البيانات المحلية. الطلب لن يظهر في دليل الفروع أو يسجل دخولًا قبل موافقة الإدارة.</p><div class="signed-in-actions"><a href="index.html">العودة إلى دوائي</a><button type="button" id="back-to-login">رجوع لتسجيل الدخول</button></div>`;
+  panel.innerHTML = `<span class="pending-mark">طلب قيد المراجعة</span><h2>وصلنا طلب ${escapeHtml(pharmacyName)}</h2><p>حفظنا بيانات الصيدلية في قاعدة البيانات المحلية. الطلب لن يظهر في دليل الفروع أو يسجل دخولًا قبل موافقة الإدارة.</p><div class="signed-in-actions"><a href="home.html">العودة إلى دوائي</a><button type="button" id="back-to-login">رجوع لتسجيل الدخول</button></div>`;
   panel.hidden = false;
   document.querySelector("#auth-title").textContent = "طلب الصيدلية";
   document.querySelector("#auth-description").textContent = "استلام الطلب لا يعني اعتماد بيانات الفرع.";
@@ -191,10 +192,17 @@ form.addEventListener("submit", async (event) => {
       setMessage(response.message, "success");
     } else {
       const response = await requestApi(state.mode === "register" ? "register" : "login", state.mode === "register" ? { ...payload, privacyAccepted: payload.privacyAccepted } : { role: state.role, contact: payload.contact, password: payload.password });
-      if (response.user) window.location.assign("index.html?welcome=1#top");
+      if (response.user) window.location.assign("home.html?welcome=1#top");
     }
   } catch (error) {
-    setMessage(error.message || "حصلت مشكلة في الاتصال. جرّب تاني.");
+    if (staticSiteMode) {
+      const localUser = { role: payload.role, name: payload.fullName || "مستخدم دوائي", contact: payload.contact, pharmacyName: payload.pharmacyName || "" };
+      try { localStorage.setItem("dawaey-static-user", JSON.stringify(localUser)); } catch { /* Continue in memory if storage is unavailable. */ }
+      if (state.role === "pharmacy" && state.mode === "register") showPendingApplication(payload.pharmacyName || "الصيدلية");
+      else window.location.assign("home.html?welcome=1#top");
+    } else {
+      setMessage(error.message || "حصلت مشكلة في الاتصال. جرّب تاني.");
+    }
   } finally {
     setBusy(false);
   }
@@ -243,7 +251,21 @@ async function initializeAuth() {
     fillLocationSuggestions(bootstrap.pharmacies ?? []);
     if (session.user) showAccount(session.user);
   } catch {
-    setMessage("خدمة الحسابات مش شغالة. افتح الموقع من الخادم المحلي بعد تشغيله.");
+    staticSiteMode = true;
+    try {
+      const response = await fetch("data/dawaey-data.json", { cache: "no-store" });
+      const workbook = await response.json();
+      fillLocationSuggestions(workbook.sheets?.["بيانات الصيداليات"] ?? []);
+    } catch {
+      // Location suggestions are optional in static mode.
+    }
+    try {
+      const localUser = JSON.parse(localStorage.getItem("dawaey-static-user") || "null");
+      if (localUser) showAccount(localUser);
+      else setMessage("وضع العرض: اكتب بياناتك للدخول التجريبي ومتابعة البحث.", "success");
+    } catch {
+      setMessage("وضع العرض: اكتب بياناتك للدخول التجريبي ومتابعة البحث.", "success");
+    }
   }
 }
 
