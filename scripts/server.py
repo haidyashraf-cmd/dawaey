@@ -33,7 +33,8 @@ LAST_GEOCODE_REQUEST = 0.0
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 TELEGRAM_ADMIN_CHAT_ID = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "").strip()
 TELEGRAM_WEBHOOK_SECRET = os.environ.get("TELEGRAM_WEBHOOK_SECRET", "").strip()
-FRONTEND_ORIGINS = {origin.strip().rstrip("/") for origin in os.environ.get("DAWAEY_FRONTEND_ORIGINS", "").split(",") if origin.strip()}
+PUBLIC_ORIGIN = os.environ.get("DAWAEY_PUBLIC_URL", "https://dawaey-cilkquad.manus.space").strip().rstrip("/")
+FRONTEND_ORIGINS = {origin.strip().rstrip("/") for origin in os.environ.get("DAWAEY_FRONTEND_ORIGINS", "https://haidyashraf-cmd.github.io").split(",") if origin.strip()}
 
 
 def db_execute(connection, query: str, params: tuple = ()):
@@ -226,6 +227,22 @@ def handle_telegram_update(update: dict) -> None:
     telegram_request("answerCallbackQuery", {"callback_query_id": callback_id, "text": text, "show_alert": True})
     if callback_message.get("chat", {}).get("id"):
         telegram_request("editMessageReplyMarkup", {"chat_id": callback_message["chat"]["id"], "message_id": callback_message.get("message_id"), "reply_markup": {"inline_keyboard": []}})
+
+
+def configure_telegram_webhook() -> None:
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_WEBHOOK_SECRET:
+        print("Telegram webhook is not configured")
+        return
+    try:
+        result = telegram_request("setWebhook", {
+            "url": f"{PUBLIC_ORIGIN}/api/telegram/webhook",
+            "secret_token": TELEGRAM_WEBHOOK_SECRET,
+            "allowed_updates": ["message", "callback_query"],
+            "drop_pending_updates": False,
+        })
+        print(f"Telegram webhook configured: {result}")
+    except Exception as error:
+        print(f"Could not configure Telegram webhook: {error}")
 
 
 def create_session(connection: sqlite3.Connection, account_id: int) -> str:
@@ -596,6 +613,7 @@ def main() -> None:
         raise FileNotFoundError(f"Missing published dataset: {DATA_PATH}")
     print("Dawaey published dataset loaded")
     initialize_database()
+    configure_telegram_webhook()
     port = int(os.environ.get("PORT", "5173"))
     server = ThreadingHTTPServer(("", port), DawaeyHandler)
     print(f"Dawaey server listening on http://localhost:{port}")
