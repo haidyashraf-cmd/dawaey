@@ -77,8 +77,11 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .submit-button:hover { background: #075c4c; transform: translateY(-1px); }
 .submit-button:disabled { opacity: .64; cursor: wait; transform: none; }
 .review-note { margin: 8px 0 0; color: #8b6242; font-size: 8px; line-height: 1.7; }
-.google-button { display: flex; width: 100%; min-height: 36px; align-items: center; justify-content: center; gap: 8px; margin-top: 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--muted); cursor: not-allowed; font-size: 9px; }
-.google-button span { color: #889798; font-size: 8px; }
+.google-button { display: flex; width: 100%; min-height: 42px; align-items: center; justify-content: center; gap: 9px; margin-top: 8px; border: 1px solid #dadce0; border-radius: 4px; background: #fff; color: #3c4043; cursor: pointer; font-size: 9px; font-weight: 700; transition: background .15s, box-shadow .15s; }
+.google-button:hover { background: #f8fafd; box-shadow: 0 1px 3px rgba(60,64,67,.22); }
+.google-button:disabled { cursor: wait; opacity: .65; }
+.google-mark { display: inline-grid; width: 18px; height: 18px; place-items: center; color: #4285f4; font-family: Arial, sans-serif; font-size: 16px; font-weight: 800; }
+.google-label { color: #3c4043 !important; font-size: 9px !important; }
 .form-footnote { margin: 9px 0 0; color: var(--muted); font-size: 8px; text-align: center; }
 .auth-footer { display: flex; justify-content: center; gap: 8px; margin: auto 0 0; padding-top: 12px; color: #859593; font-size: 8px; }
 .auth-footer a { color: inherit; text-decoration: none; }.auth-footer a:hover { color: var(--teal-dark); }

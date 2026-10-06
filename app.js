@@ -4,7 +4,7 @@ const SHEET_NAMES = {
   supply: "طلبات التوريد",
 };
 
-const API_BASE = (window.DAWAEY_API_BASE ?? ((location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "" : "https://dawaey-production.up.railway.app")).replace(/\/+$/, "");
+const API_BASE = (window.DAWAEY_API_BASE ?? ((location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "" : "https://dawaey-cilkquad.manus.space")).replace(/\/+$/, "");
 const apiUrl = (path) => `${API_BASE}/api/${path}`;
 
 const sectionNames = {
@@ -460,10 +460,8 @@ function setTheme(theme) {
 }
 
 async function loadDashboardData() {
-  const localResponse = await fetch("data/dawaey-data.json");
-  if (localResponse.ok) return localResponse.json();
-  const apiResponse = await fetch(apiUrl("bootstrap"), { credentials: "include" });
-  const payload = await apiResponse.json();
+  const apiResponse = await fetch(apiUrl("pharmacy/bootstrap"), { credentials: "include" });
+  const payload = await apiResponse.json().catch(() => ({}));
   if (!apiResponse.ok) throw new Error(payload.error || "تعذر تحميل بيانات لوحة الصيدلية");
   if (payload.sheets) return { source: payload.source, sheets: payload.sheets };
   return { source: payload.source, sheets: { "الاصناف والكميات": payload.catalog || [], "طلبات التوريد": payload.catalog || [], "بيانات الصيداليات": payload.pharmacies || [] } };
@@ -471,6 +469,12 @@ async function loadDashboardData() {
 async function startApp() {
   document.querySelector("#today-label").textContent = dateFormat.format(new Date());
   try {
+    const sessionResponse = await fetch(apiUrl("session"), { credentials: "include" });
+    const session = await sessionResponse.json().catch(() => ({}));
+    if (!session.user || session.user.role !== "pharmacy") {
+      window.location.assign("auth.html?role=pharmacy");
+      return;
+    }
     state.data = await loadDashboardData();
     showView("overview", false);
     startStockAlertPolling();

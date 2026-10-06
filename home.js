@@ -1,5 +1,5 @@
 const INVENTORY_SHEET = "الاصناف والكميات";
-const API_BASE = (window.DAWAEY_API_BASE ?? ((location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "" : "https://dawaey-production.up.railway.app")).replace(/\/+$/, "");
+const API_BASE = (window.DAWAEY_API_BASE ?? ((location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "" : "https://dawaey-cilkquad.manus.space")).replace(/\/+$/, "");
 const apiUrl = (path) => `${API_BASE}/api/${path}`;
 const SUPPLY_SHEET = "طلبات التوريد";
 const PHARMACY_SHEET = "بيانات الصيداليات";

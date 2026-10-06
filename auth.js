@@ -4,7 +4,8 @@ const form = document.querySelector("#account-form");
 const message = document.querySelector("#form-message");
 const submitButton = document.querySelector("#submit-button");
 const numberFormat = new Intl.NumberFormat("ar-EG");
-const API_BASE = (window.DAWAEY_API_BASE ?? ((location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "" : "https://dawaey-production.up.railway.app")).replace(/\/+$/, "");
+const googleButton = document.querySelector(".google-button");
+const API_BASE = (window.DAWAEY_API_BASE ?? ((location.hostname === "localhost" || location.hostname === "127.0.0.1") ? "" : "https://dawaey-cilkquad.manus.space")).replace(/\/+$/, "");
 const apiUrl = (path) => `${API_BASE}/api/${path}`;
 
 function setMessage(text, kind = "error") {
@@ -54,6 +55,7 @@ function syncForm() {
   form.elements.password.autocomplete = registering ? "new-password" : "current-password";
   document.querySelector("#password-strength").hidden = !registering;
   document.querySelector("#review-note").hidden = !(registering && state.role === "pharmacy");
+  googleButton.hidden = registering || state.role !== "patient";
   document.querySelector("#submit-button").innerHTML = `${registering ? "إنشاء الحساب" : "تسجيل الدخول"} <span aria-hidden="true">←</span>`;
   document.querySelector("#auth-title").textContent = registering ? "حسابك يبدأ من هنا" : "سجّل دخولك";
   document.querySelector("#auth-description").textContent = registering
@@ -141,6 +143,14 @@ function setBusy(busy) {
   submitButton.disabled = busy;
   submitButton.querySelector("span").textContent = busy ? "..." : "←";
 }
+
+
+googleButton.addEventListener("click", () => {
+  if (state.busy || state.role !== "patient" || state.mode !== "login") return;
+  googleButton.disabled = true;
+  googleButton.querySelector(".google-label").textContent = "جارٍ التحويل إلى Google...";
+  window.location.assign(`${API_BASE}/api/auth/google/start`);
+});
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -247,7 +257,13 @@ document.addEventListener("click", async (event) => {
 async function initializeAuth() {
   const savedTheme = localStorage.getItem("dawaey-theme");
   if (savedTheme === "dark" || savedTheme === "light") document.documentElement.dataset.theme = savedTheme;
+  const requestedRole = new URLSearchParams(location.search).get("role");
+  if (requestedRole === "pharmacy") state.role = "pharmacy";
   syncForm();
+  const oauth = new URLSearchParams(location.search).get("oauth");
+  const oauthReason = new URLSearchParams(location.search).get("reason");
+  if (oauth === "success") setMessage("تم تسجيل الدخول باستخدام Google بنجاح.", "success");
+  if (oauth === "error") setMessage(oauthReason === "not_configured" ? "تسجيل Google غير مهيأ على الخادم حاليًا." : oauthReason === "invalid_state" ? "انتهت جلسة Google الآمنة. ابدأ تسجيل الدخول من جديد." : "تعذر إكمال تسجيل الدخول باستخدام Google.");
   try {
     const [bootstrap, session] = await Promise.all([requestApi("bootstrap"), requestApi("session")]);
     fillLocationSuggestions(bootstrap.pharmacies ?? []);
